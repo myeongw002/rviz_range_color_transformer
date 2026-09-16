@@ -1,0 +1,11 @@
+<library path="rviz_range_color_transformer">
+  <class
+    name="rviz_range_color_transformer/Range"
+    type="rviz_range_color_transformer::RangeColorTransformer"
+    base_class_type="rviz_default_plugins::PointCloudTransformer">
+    <description>
+      Colors PointCloud2 points by Euclidean 3D range sqrt(x^2+y^2+z^2)
+      without modifying or republishing the cloud.
+    </description>
+  </class>
+</library>
