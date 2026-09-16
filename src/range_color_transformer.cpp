@@ -1,7 +1,9 @@
 #include "rviz_range_color_transformer/range_color_transformer.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
+#include <cstddef>
 #include <limits>
 #include <vector>
 
@@ -13,6 +15,25 @@ namespace rviz_range_color_transformer
 {
 namespace
 {
+
+enum ColorMap
+{
+  Turbo = 0,
+  Viridis = 1,
+  Plasma = 2,
+  Inferno = 3,
+  Magma = 4,
+  Rainbow = 5,
+  Grayscale = 6,
+};
+
+struct ColorStop
+{
+  float position;
+  float r;
+  float g;
+  float b;
+};
 
 bool is_numeric_datatype(uint8_t datatype)
 {
@@ -29,6 +50,121 @@ bool is_numeric_datatype(uint8_t datatype)
       return true;
     default:
       return false;
+  }
+}
+
+template<std::size_t N>
+void sample_stops(
+  const std::array<ColorStop, N> & stops,
+  float value,
+  Ogre::ColourValue & color)
+{
+  value = std::clamp(value, 0.0f, 1.0f);
+
+  if (value <= stops.front().position) {
+    color.r = stops.front().r;
+    color.g = stops.front().g;
+    color.b = stops.front().b;
+    return;
+  }
+
+  if (value >= stops.back().position) {
+    color.r = stops.back().r;
+    color.g = stops.back().g;
+    color.b = stops.back().b;
+    return;
+  }
+
+  for (std::size_t i = 1; i < N; ++i) {
+    if (value <= stops[i].position) {
+      const auto & a = stops[i - 1];
+      const auto & b = stops[i];
+      const float span = b.position - a.position;
+      const float t = span > 0.0f ? (value - a.position) / span : 0.0f;
+      color.r = a.r + t * (b.r - a.r);
+      color.g = a.g + t * (b.g - a.g);
+      color.b = a.b + t * (b.b - a.b);
+      return;
+    }
+  }
+}
+
+void apply_color_map(int color_map, float value, Ogre::ColourValue & color)
+{
+  // Compact anchor tables are linearly interpolated. They provide the visual
+  // character of the named maps without adding an external plotting dependency.
+  static constexpr std::array<ColorStop, 6> turbo{{
+    {0.0f, 0.188f, 0.071f, 0.231f},
+    {0.2f, 0.231f, 0.318f, 0.545f},
+    {0.4f, 0.275f, 0.667f, 0.741f},
+    {0.6f, 0.631f, 0.992f, 0.286f},
+    {0.8f, 0.961f, 0.510f, 0.125f},
+    {1.0f, 0.478f, 0.016f, 0.012f},
+  }};
+
+  static constexpr std::array<ColorStop, 6> viridis{{
+    {0.0f, 0.267f, 0.005f, 0.329f},
+    {0.2f, 0.255f, 0.267f, 0.530f},
+    {0.4f, 0.165f, 0.471f, 0.558f},
+    {0.6f, 0.133f, 0.658f, 0.518f},
+    {0.8f, 0.478f, 0.821f, 0.318f},
+    {1.0f, 0.992f, 0.906f, 0.145f},
+  }};
+
+  static constexpr std::array<ColorStop, 6> plasma{{
+    {0.0f, 0.050f, 0.030f, 0.528f},
+    {0.2f, 0.417f, 0.001f, 0.658f},
+    {0.4f, 0.693f, 0.165f, 0.565f},
+    {0.6f, 0.882f, 0.392f, 0.383f},
+    {0.8f, 0.988f, 0.652f, 0.212f},
+    {1.0f, 0.940f, 0.975f, 0.131f},
+  }};
+
+  static constexpr std::array<ColorStop, 6> inferno{{
+    {0.0f, 0.001f, 0.000f, 0.014f},
+    {0.2f, 0.258f, 0.039f, 0.406f},
+    {0.4f, 0.578f, 0.149f, 0.404f},
+    {0.6f, 0.865f, 0.316f, 0.226f},
+    {0.8f, 0.988f, 0.645f, 0.039f},
+    {1.0f, 0.988f, 1.000f, 0.644f},
+  }};
+
+  static constexpr std::array<ColorStop, 6> magma{{
+    {0.0f, 0.001f, 0.000f, 0.014f},
+    {0.2f, 0.232f, 0.059f, 0.439f},
+    {0.4f, 0.550f, 0.161f, 0.506f},
+    {0.6f, 0.868f, 0.288f, 0.409f},
+    {0.8f, 0.995f, 0.624f, 0.427f},
+    {1.0f, 0.987f, 0.991f, 0.749f},
+  }};
+
+  switch (color_map) {
+    case Turbo:
+      sample_stops(turbo, value, color);
+      break;
+    case Viridis:
+      sample_stops(viridis, value, color);
+      break;
+    case Plasma:
+      sample_stops(plasma, value, color);
+      break;
+    case Inferno:
+      sample_stops(inferno, value, color);
+      break;
+    case Magma:
+      sample_stops(magma, value, color);
+      break;
+    case Rainbow:
+      rviz_default_plugins::getRainbowColor(value, color);
+      break;
+    case Grayscale:
+      color.r = value;
+      color.g = value;
+      color.b = value;
+      break;
+    default:
+      sample_stops(turbo, value, color);
+      break;
   }
 }
 
@@ -140,6 +276,7 @@ bool RangeColorTransformer::transform(
   }
 
   const bool invert = invert_colors_property_->getBool();
+  const int color_map = color_map_property_->getOptionInt();
 
   for (std::size_t i = 0; i < num_points; ++i) {
     auto & color = points_out[i].color;
@@ -159,8 +296,7 @@ bool RangeColorTransformer::transform(
       normalized = 1.0f - normalized;
     }
 
-    // RViz's rainbow helper maps 0 -> blue and 1 -> red.
-    rviz_default_plugins::getRainbowColor(normalized, color);
+    apply_color_map(color_map, normalized, color);
     color.a = 1.0f;
   }
 
@@ -175,6 +311,18 @@ void RangeColorTransformer::createProperties(
   if (!(mask & Support_Color)) {
     return;
   }
+
+  color_map_property_ = new rviz_common::properties::EnumProperty(
+    "Color Map", "Turbo",
+    "Color map used to visualize normalized 3D range.",
+    parent_property, SIGNAL(needRetransform()), this);
+  color_map_property_->addOption("Turbo", Turbo);
+  color_map_property_->addOption("Viridis", Viridis);
+  color_map_property_->addOption("Plasma", Plasma);
+  color_map_property_->addOption("Inferno", Inferno);
+  color_map_property_->addOption("Magma", Magma);
+  color_map_property_->addOption("Rainbow", Rainbow);
+  color_map_property_->addOption("Grayscale", Grayscale);
 
   auto_compute_bounds_property_ = new rviz_common::properties::BoolProperty(
     "Auto Compute Bounds", true,
@@ -195,9 +343,10 @@ void RangeColorTransformer::createProperties(
 
   invert_colors_property_ = new rviz_common::properties::BoolProperty(
     "Invert Colors", false,
-    "Default is near=blue, far=red. Enable for near=red, far=blue.",
+    "Reverse the selected color map so near and far colors are exchanged.",
     parent_property, SIGNAL(needRetransform()), this);
 
+  out_props.push_back(color_map_property_);
   out_props.push_back(auto_compute_bounds_property_);
   out_props.push_back(min_range_property_);
   out_props.push_back(max_range_property_);

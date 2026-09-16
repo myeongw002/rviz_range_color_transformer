@@ -15,7 +15,15 @@ The plugin appears in the existing RViz2 `PointCloud2` display under **Color Tra
 - Uses the existing `x`, `y`, `z` fields only.
 - Does not modify or republish the input `PointCloud2`.
 - Automatic per-frame range bounds or manual min/max bounds.
-- Rainbow color map, near → blue and far → red by default.
+- Selectable color maps:
+  - Turbo
+  - Viridis
+  - Plasma
+  - Inferno
+  - Magma
+  - Rainbow
+  - Grayscale
+- Turbo is the default color map.
 - Optional color inversion.
 - Intended for ROS 2 Humble / Ubuntu 22.04.
 
@@ -32,6 +40,17 @@ colcon build --symlink-install --packages-select rviz_range_color_transformer
 source install/setup.bash
 ```
 
+If the repository is already cloned:
+
+```bash
+cd ~/ROS2/compa_ws/src/rviz_range_color_transformer
+git pull
+
+cd ~/ROS2/compa_ws
+colcon build --symlink-install --packages-select rviz_range_color_transformer
+source install/setup.bash
+```
+
 Then restart RViz2 from a terminal where the workspace has been sourced.
 
 ## Use
@@ -39,10 +58,13 @@ Then restart RViz2 from a terminal where the workspace has been sourced.
 1. Add or select a `PointCloud2` display in RViz2.
 2. Set the cloud topic, for example `/velodyne_points` or `/pc_interpoled`.
 3. Set **Color Transformer** to **Range**.
-4. Leave **Auto Compute Bounds** enabled, or disable it and set **Min Range** / **Max Range** manually.
-5. Enable **Invert Colors** if you want near → red and far → blue.
+4. Select the desired **Color Map**.
+5. Leave **Auto Compute Bounds** enabled, or disable it and set **Min Range** / **Max Range** manually.
+6. Enable **Invert Colors** to reverse the selected map.
 
 The range is computed in the incoming point cloud coordinate frame, before the RViz fixed-frame transform. This corresponds to sensor-relative range for clouds expressed in the sensor frame.
+
+The named scientific color maps are implemented with compact RGB anchor tables and linear interpolation, keeping the plugin dependency-free beyond RViz/ROS2.
 
 ## Notes
 
